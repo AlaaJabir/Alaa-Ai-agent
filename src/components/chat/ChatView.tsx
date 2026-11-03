@@ -9,11 +9,14 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  CheckCircle,
-  Clock,
   ExternalLink,
   Brain,
   WifiOff,
+  Volume2,
+  VolumeX,
+  Paperclip,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { ChatMessage, Conversation, ToolCallProposal } from '../../types/chat';
 import {
@@ -27,6 +30,7 @@ import { GeminiClient } from '../../core/ai/geminiClient';
 import { ApprovalEngine } from '../../core/approval/approvalEngine';
 import { MemoryService } from '../../core/memory/memoryService';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useTextToSpeech } from '../../hooks/useTextToSpeech';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { RiskBadge } from '../common/RiskBadge';
 
@@ -46,8 +50,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [contextMemoriesCount, setContextMemoriesCount] = useState(0);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [attachedFileInfo, setAttachedFileInfo] = useState<{ name: string; preview?: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const isOnline = useOnlineStatus();
   const {
     isListening,
@@ -58,7 +66,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     resetTranscript,
   } = useSpeechRecognition();
 
-  // Load conversation list and active conversation
+  const { isSpeaking, isSupported: isTtsSupported, speak, stop: stopSpeaking } = useTextToSpeech();
+
   useEffect(() => {
     loadConversations();
     loadMemoryContextCount();
@@ -127,10 +136,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setCurrentConvId(id);
     setMessages([]);
     setInputText('');
+    setAttachedFileInfo(null);
   };
 
   const handleDeleteConversation = async (id: string) => {
     if (window.confirm('Delete this conversation and its local message history?')) {
+      stopSpeaking();
       await deleteConversation(id);
       const remaining = conversations.filter((c) => c.id !== id);
       setConversations(remaining);
@@ -148,14 +159,41 @@ export const ChatView: React.FC<ChatViewProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setAttachedFileInfo({
+          name: file.name,
+          preview: event.target?.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setAttachedFileInfo({
+        name: file.name,
+      });
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const text = inputText.trim();
-    if (!text || isLoading) return;
+    let text = inputText.trim();
+    if (!text && !attachedFileInfo) return;
+    if (isLoading) return;
 
     if (!isOnline) {
       setErrorBanner('Cannot contact Gemini AI while offline. Local data is preserved.');
       return;
+    }
+
+    if (attachedFileInfo) {
+      text = text
+        ? `[Attached phone file: ${attachedFileInfo.name}]\n${text}`
+        : `[Shared phone file: ${attachedFileInfo.name}]. Please analyze this file.`;
     }
 
     setErrorBanner(null);
@@ -188,6 +226,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     await saveMessage(userMsg);
     setInputText('');
+    setAttachedFileInfo(null);
     resetTranscript();
     setIsLoading(true);
 
@@ -244,6 +283,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
       setMessages((prev) => [...prev, assistantMsg]);
       await saveMessage(assistantMsg);
 
+      // Auto-speak voice if enabled
+      if (autoSpeak && isTtsSupported) {
+        speak(response.text);
+      }
+
       // Update conversation title and preview
       const conv = await getConversation(activeConvId);
       if (conv) {
@@ -278,9 +322,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="flex flex-col h-[calc(100dvh-135px)] sm:h-[calc(100vh-120px)] bg-slate-950 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
       {/* Chat Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800/80">
-        <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-slate-900/90 border-b border-slate-800/80">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
             <Sparkles className="w-4 h-4" />
             <span
               className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${
@@ -288,18 +332,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
               }`}
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">MY AGENT</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-sm font-semibold text-white truncate">MY AGENT</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
                 Gemini 3.8
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 truncate">
               {contextMemoriesCount > 0 && (
-                <span className="flex items-center gap-1 text-purple-400">
+                <span className="flex items-center gap-1 text-purple-400 shrink-0">
                   <Brain className="w-3 h-3" />
-                  {contextMemoriesCount} memories active
+                  {contextMemoriesCount} memories
                 </span>
               )}
               <span>• Local-First</span>
@@ -307,7 +351,37 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Voice Auto-Speak Toggle */}
+          {isTtsSupported && (
+            <button
+              onClick={() => {
+                if (isSpeaking) {
+                  stopSpeaking();
+                }
+                setAutoSpeak(!autoSpeak);
+              }}
+              className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                autoSpeak
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              title={autoSpeak ? 'Voice response enabled (Click to mute)' : 'Enable voice responses'}
+            >
+              {autoSpeak ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Voice ON</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Voice OFF</span>
+                </>
+              )}
+            </button>
+          )}
+
           <button
             onClick={startNewConversation}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
@@ -337,6 +411,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       )}
 
+      {/* Speaking Indicator */}
+      {isSpeaking && (
+        <div className="px-4 py-1.5 bg-blue-600/20 border-b border-blue-500/30 flex items-center justify-between text-xs text-blue-300">
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-3.5 h-3.5 animate-pulse text-blue-400" />
+            <span>MY AGENT is speaking...</span>
+          </div>
+          <button
+            onClick={stopSpeaking}
+            className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-semibold"
+          >
+            Stop Voice
+          </button>
+        </div>
+      )}
+
       {/* Error Banner */}
       {errorBanner && (
         <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 flex items-center justify-between text-xs text-rose-300">
@@ -359,7 +449,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
             <h3 className="text-base font-semibold text-white">How can MY AGENT assist you today?</h3>
             <p className="mt-1 text-xs text-slate-400 max-w-sm">
-              Ask questions, store private notes, plan workflows, or test the secure Approval Engine.
+              Ask questions, dictate with your microphone, attach phone photos, or test the Approval Engine.
             </p>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left w-full max-w-md">
@@ -370,10 +460,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 📊 "Check app operating status"
               </button>
               <button
-                onClick={() => setInputText('Remember that my preferred coffee is Ethiopian pour-over with oat milk.')}
+                onClick={() => setInputText('Remember that my project deadline is next Friday.')}
                 className="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/60 border border-slate-800 text-xs text-slate-300 transition"
               >
-                🧠 "Save coffee preference to memory"
+                🧠 "Save project deadline to memory"
               </button>
               <button
                 onClick={() => setInputText('Propose an action plan to prepare for a software launch next week.')}
@@ -407,9 +497,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </div>
 
               {/* Message Bubble */}
-              <div className="space-y-2">
+              <div className="space-y-2 max-w-[85%] sm:max-w-[88%]">
                 <div
-                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed relative group ${
                     msg.role === 'user'
                       ? 'bg-blue-600 text-white rounded-tr-none'
                       : msg.status === 'error'
@@ -418,6 +508,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
+
+                  {/* Speaker icon for assistant message */}
+                  {msg.role === 'assistant' && isTtsSupported && (
+                    <button
+                      onClick={() => (isSpeaking ? stopSpeaking() : speak(msg.content))}
+                      className="mt-2 flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 pt-1 border-t border-slate-800/60 transition"
+                      title="Speak response out loud"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Listen</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Embedded Tool Proposal Cards */}
@@ -491,11 +593,55 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Attachment Preview Chip */}
+      {attachedFileInfo && (
+        <div className="px-4 py-2 bg-slate-900 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center gap-2 truncate">
+            {attachedFileInfo.preview ? (
+              <img
+                src={attachedFileInfo.preview}
+                alt="preview"
+                className="w-6 h-6 rounded object-cover border border-slate-700"
+              />
+            ) : (
+              <Paperclip className="w-4 h-4 text-blue-400 shrink-0" />
+            )}
+            <span className="truncate">{attachedFileInfo.name}</span>
+          </div>
+          <button
+            onClick={() => setAttachedFileInfo(null)}
+            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Input Bar */}
       <form
         onSubmit={handleSendMessage}
         className="p-3 bg-slate-900/90 border-t border-slate-800/80 flex items-center gap-2"
       >
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelected}
+          accept="image/*,.pdf,.txt,.doc,.docx"
+          className="hidden"
+        />
+
+        {/* Paperclip / File Attachment Button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          title="Attach photo or file from phone"
+        >
+          <Paperclip className="w-4 h-4 text-blue-400" />
+        </button>
+
+        {/* Voice Input Microphone Button */}
         {isVoiceSupported && (
           <button
             type="button"
@@ -528,7 +674,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         <button
           type="submit"
-          disabled={!inputText.trim() || isLoading || !isOnline}
+          disabled={(!inputText.trim() && !attachedFileInfo) || isLoading || !isOnline}
           className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-40 disabled:hover:bg-blue-600 text-white shadow-md shadow-blue-600/30 transition shrink-0"
         >
           <Send className="w-4 h-4" />
