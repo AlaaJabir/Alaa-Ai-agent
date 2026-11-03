@@ -71,10 +71,18 @@ export async function handleChat(req: any, res: any) {
     });
   }
 
-  const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+  // Select primary model (fallback to gemini-2.5-flash or gemini-3.1-flash-lite if gemini-3.8-flash has capacity issues)
+  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
 
     // Build context prompt
     let promptWithContext = '';
@@ -105,28 +113,41 @@ export async function handleChat(req: any, res: any) {
     });
 
     let response;
-    try {
-      response = await ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          temperature: 0.7,
-        },
-      });
-    } catch (primaryErr: any) {
-      if (primaryErr?.message?.includes('503') || primaryErr?.message?.includes('high demand') || primaryErr?.message?.includes('UNAVAILABLE')) {
-        console.warn('Primary model experiencing high demand, trying gemini-3.1-flash-lite fallback...');
-        response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
+    let usedModel = preferredModel;
+
+    // Helper to generate content with timeout
+    const tryGenerate = async (targetModel: string, timeoutMs: number) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await ai.models.generateContent({
+          model: targetModel,
           contents,
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             temperature: 0.7,
+            abortSignal: controller.signal,
           },
         });
-      } else {
-        throw primaryErr;
+        clearTimeout(timer);
+        return res;
+      } catch (e) {
+        clearTimeout(timer);
+        throw e;
+      }
+    };
+
+    try {
+      response = await tryGenerate(preferredModel, 9000);
+    } catch (primaryErr: any) {
+      console.warn(`Model ${preferredModel} failed or timed out (${primaryErr?.message}), trying gemini-2.5-flash fallback...`);
+      try {
+        usedModel = 'gemini-2.5-flash';
+        response = await tryGenerate('gemini-2.5-flash', 9000);
+      } catch (fallbackErr: any) {
+        console.warn(`Fallback to gemini-2.5-flash failed, trying gemini-3.1-flash-lite...`);
+        usedModel = 'gemini-3.1-flash-lite';
+        response = await tryGenerate('gemini-3.1-flash-lite', 9000);
       }
     }
 
@@ -163,18 +184,18 @@ export async function handleChat(req: any, res: any) {
     return res.status(200).json({
       text: cleanText || rawText,
       toolProposals,
-      model,
+      model: usedModel,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
     console.error('Gemini API call failed:', err?.message || err);
     const safeMessage = err?.message?.includes('API_KEY_INVALID')
       ? 'The configured Gemini API key is invalid.'
-      : 'AI processing failed. Please check your connectivity and try again.';
+      : err?.message || 'AI processing failed. Please check your connectivity and try again.';
 
     return res.status(500).json({
       error: safeMessage,
-      details: process.env.NODE_ENV === 'development' ? err?.message : undefined,
+      details: err?.message,
     });
   }
 }

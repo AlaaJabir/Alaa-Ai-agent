@@ -25,12 +25,19 @@ export class GeminiClient {
       if (!response.ok) {
         let errorMsg = `Server error (${response.status})`;
         try {
-          const errData = await response.json();
-          if (errData.error) {
-            errorMsg = errData.error;
+          const rawText = await response.text();
+          try {
+            const errData = JSON.parse(rawText);
+            if (errData.error) {
+              errorMsg = errData.error;
+            }
+          } catch {
+            if (rawText && rawText.length < 250) {
+              errorMsg = rawText;
+            }
           }
         } catch {
-          // ignore json parse error
+          // ignore
         }
         throw new Error(errorMsg);
       }

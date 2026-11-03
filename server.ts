@@ -15,11 +15,24 @@ async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
 
-  app.use(express.json({ limit: '5mb' }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // API endpoints
   app.get('/api/health', (req, res) => handleHealth(req, res));
-  app.post('/api/chat', (req, res) => handleChat(req, res));
+
+  app.post('/api/chat', async (req, res) => {
+    try {
+      await handleChat(req, res);
+    } catch (err: any) {
+      console.error('Unhandled error in /api/chat route:', err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: err?.message || 'Server error',
+        });
+      }
+    }
+  });
 
   const isProduction = process.env.NODE_ENV === 'production';
 
