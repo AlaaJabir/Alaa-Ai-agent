@@ -7,6 +7,7 @@ import {
   Activity,
   Settings,
   Sparkles,
+  Phone,
 } from 'lucide-react';
 import { PWAInstallButton } from '../../components/common/PWAInstallButton';
 import { OfflineIndicator } from '../../components/common/OfflineIndicator';
@@ -17,6 +18,7 @@ interface AppLayoutProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   pendingApprovalsCount: number;
+  onStartCall?: () => void;
   children: React.ReactNode;
 }
 
@@ -31,6 +33,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   activeTab,
   onSelectTab,
   pendingApprovalsCount,
+  onStartCall,
   children,
 }) => {
   const navItems: NavItemConfig[] = [
@@ -67,6 +70,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               <div className="text-[11px] text-slate-400">Personal AI Operating System</div>
             </div>
           </div>
+
+          {/* Quick Voice Call Launcher Button */}
+          {onStartCall && (
+            <button
+              onClick={onStartCall}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white text-xs font-bold shadow-lg shadow-blue-600/30 hover:brightness-110 active:scale-95 transition"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Voice Call Mode</span>
+            </button>
+          )}
 
           {/* Navigation Links */}
           <nav className="space-y-1">
@@ -124,6 +138,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onStartCall && (
+              <button
+                onClick={onStartCall}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-blue-500/20 active:scale-95 transition"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>Call AI</span>
+              </button>
+            )}
             <PWAInstallButton compact />
           </div>
         </header>

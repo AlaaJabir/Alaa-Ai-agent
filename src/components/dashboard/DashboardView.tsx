@@ -11,6 +11,7 @@ import {
   WifiOff,
   CheckCircle2,
   Clock,
+  Phone,
 } from 'lucide-react';
 import { getAllConversations } from '../../db/conversations';
 import { getPendingApprovals } from '../../db/approvals';
@@ -25,9 +26,10 @@ import { RiskBadge } from '../common/RiskBadge';
 interface DashboardViewProps {
   onNavigate: (tab: 'chat' | 'memory' | 'approvals' | 'activity' | 'settings', conversationId?: string) => void;
   onNewChat: () => void;
+  onStartCall?: () => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onNewChat }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onNewChat, onStartCall }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
   const [memoryCount, setMemoryCount] = useState<number>(0);
@@ -93,11 +95,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onNewC
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2.5">
+            {onStartCall && (
+              <button
+                onClick={onStartCall}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:brightness-110 active:scale-95 text-white text-sm font-bold shadow-lg shadow-blue-600/30 transition"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call AI (Voice)</span>
+              </button>
+            )}
+
             <button
               onClick={onNewChat}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-sm font-semibold shadow-lg shadow-blue-600/25 transition"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-100 text-sm font-semibold border border-slate-700/80 transition"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-4 h-4 text-blue-400" />
               <span>Start Conversation</span>
             </button>
           </div>

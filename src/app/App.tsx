@@ -6,12 +6,14 @@ import { MemoryView } from '../components/memory/MemoryView';
 import { ApprovalCenter } from '../components/approval/ApprovalCenter';
 import { AuditLogView } from '../components/audit/AuditLogView';
 import { SettingsView } from '../components/settings/SettingsView';
+import { VoiceCallModal } from '../components/call/VoiceCallModal';
 import { getPendingApprovals } from '../db/approvals';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(undefined);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  const [isCallModalOpen, setIsCallModalOpen] = useState<boolean>(false);
 
   const refreshPendingCount = async () => {
     try {
@@ -29,7 +31,7 @@ export default function App() {
   }, []);
 
   const handleNavigate = (
-    tab: 'chat' | 'memory' | 'approvals' | 'activity' | 'settings',
+    tab: NavTab,
     conversationId?: string
   ) => {
     if (conversationId) {
@@ -46,32 +48,48 @@ export default function App() {
   };
 
   return (
-    <AppLayout
-      activeTab={activeTab}
-      onSelectTab={(tab) => {
-        setActiveTab(tab);
-        refreshPendingCount();
-      }}
-      pendingApprovalsCount={pendingApprovalsCount}
-    >
-      {activeTab === 'dashboard' && (
-        <DashboardView onNavigate={handleNavigate} onNewChat={handleNewChat} />
-      )}
+    <>
+      <AppLayout
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          refreshPendingCount();
+        }}
+        pendingApprovalsCount={pendingApprovalsCount}
+        onStartCall={() => setIsCallModalOpen(true)}
+      >
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            onNavigate={handleNavigate}
+            onNewChat={handleNewChat}
+            onStartCall={() => setIsCallModalOpen(true)}
+          />
+        )}
 
-      {activeTab === 'chat' && (
-        <ChatView
-          initialConversationId={selectedConversationId}
-          onNavigateToApprovals={() => handleNavigate('approvals')}
-        />
-      )}
+        {activeTab === 'chat' && (
+          <ChatView
+            initialConversationId={selectedConversationId}
+            onNavigateToApprovals={() => handleNavigate('approvals')}
+            onStartCall={() => setIsCallModalOpen(true)}
+          />
+        )}
 
-      {activeTab === 'memory' && <MemoryView />}
+        {activeTab === 'memory' && <MemoryView />}
 
-      {activeTab === 'approvals' && <ApprovalCenter />}
+        {activeTab === 'approvals' && <ApprovalCenter />}
 
-      {activeTab === 'activity' && <AuditLogView />}
+        {activeTab === 'activity' && <AuditLogView />}
 
-      {activeTab === 'settings' && <SettingsView />}
-    </AppLayout>
+        {activeTab === 'settings' && <SettingsView />}
+      </AppLayout>
+
+      {/* Fullscreen Mobile Voice Call UI matching user screenshot */}
+      <VoiceCallModal
+        isOpen={isCallModalOpen}
+        onClose={() => setIsCallModalOpen(false)}
+        conversationId={selectedConversationId}
+        onNavigateToTab={handleNavigate}
+      />
+    </>
   );
 }

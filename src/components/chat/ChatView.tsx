@@ -17,6 +17,7 @@ import {
   Paperclip,
   Image as ImageIcon,
   X,
+  Phone,
 } from 'lucide-react';
 import { ChatMessage, Conversation, ToolCallProposal } from '../../types/chat';
 import {
@@ -37,11 +38,13 @@ import { RiskBadge } from '../common/RiskBadge';
 interface ChatViewProps {
   initialConversationId?: string;
   onNavigateToApprovals: () => void;
+  onStartCall?: () => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
   initialConversationId,
   onNavigateToApprovals,
+  onStartCall,
 }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConvId, setCurrentConvId] = useState<string | null>(initialConversationId || null);
@@ -379,6 +382,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <span className="hidden sm:inline">Voice OFF</span>
                 </>
               )}
+            </button>
+          )}
+
+          {onStartCall && (
+            <button
+              onClick={onStartCall}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-blue-500/20 active:scale-95 transition"
+              title="Start Holographic Voice Call"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Call AI</span>
             </button>
           )}
 
