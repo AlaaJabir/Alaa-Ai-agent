@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+
+  html, body {
+    background-color: #090a0f;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Safe area padding utilities for iPhone dynamic island and home bar */
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.h-safe-screen {
+  height: 100dvh;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "MY AGENT",
+  "description": "Private, installable personal AI agent operating system with local-first IndexedDB storage, security approval engine, and Gemini AI intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
